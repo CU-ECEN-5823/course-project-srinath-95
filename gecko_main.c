@@ -103,7 +103,6 @@ uint8_t boot_to_dfu = 0;
 
 #define TIMER_ID_RESTART    78
 #define TIMER_ID_FACTORY_RESET  77
-#define TIMER_ID_PROVISIONING   66
 
 const gecko_configuration_t config =
 {
@@ -286,8 +285,6 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		 set_device_name(&pAddr->address);
 			 gecko_cmd_mesh_node_init();
     	 }
-    	//initiate_factory_reset();
-      // Initialize Mesh stack in Node operation mode, wait for initialized event
 
       break;
 
@@ -365,9 +362,9 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				LOG_INFO("\n Button Released");
 				displayPrintf(DISPLAY_ROW_PASSKEY ,"Button Released");
 			}
-    		resp = mesh_lib_generic_server_event_handler();
+    		mesh_lib_generic_server_event_handler();
 
-    		LOG_INFO("\n Result: %d",resp);
+    		//LOG_INFO("\n Result: %d",resp);
     	}
     	break;
 
@@ -375,8 +372,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 		if(DeviceUsesServerModel())
 		{
 			LOG_INFO("\n Entered generic_server_state_changed_id ");
-			resp = mesh_lib_generic_server_event_handler();
-			LOG_INFO("\n Result: %d",resp);
+			mesh_lib_generic_server_event_handler();
 		}
 
 		break;

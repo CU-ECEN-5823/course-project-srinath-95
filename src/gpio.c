@@ -51,14 +51,12 @@ void gpioSetDisplayExtcomin(bool high)
 void GPIO_EVEN_IRQHandler()
 {
 	CORE_AtomicDisableIrq();
-	printf("\n Entered the GPIO interrupt handler");
+	LOG_INFO("\n Entered the GPIO interrupt handler");
 	//CORE_ATOMIC_IRQ_DISABLE();
 	pending_irq = GPIO_IntGet();	// gets the interrupt flag register to know the status pending interrupts
 	PB0_pressed = GPIO_PinInGet(PB0_port,PB0_pin);	// Getting the status of PB0 button
-	printf("\n button state in interrupt; %d", PB0_pressed);
 	INTERRUPT_BUTTON = true;
 	 gecko_external_signal(INTERRUPT_BUTTON);	// Call the external signal(State Machine) to notify the button press event
-	 //LOG_INFO("The pressed value is: %d",PB0_pressed );
 
 	 GPIO_IntClear(pending_irq);	// Clearing the GPIO interrupts
 	 //CORE_ATOMIC_IRQ_ENABLE();

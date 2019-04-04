@@ -8,6 +8,7 @@
 #ifndef SRC_GPIO_H_
 #define SRC_GPIO_H_
 #include <stdbool.h>
+#include "log.h"
 
 void gpioInit();
 void gpioLed0SetOn();
