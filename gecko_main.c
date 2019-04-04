@@ -312,12 +312,11 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	  resp = gecko_cmd_mesh_node_start_unprov_beaconing(0x3);
     	  printf("\n Result gecko_evt_mesh_node_initialized_id: 0x%x",resp);
     	  displayPrintf(DISPLAY_ROW_CONNECTION ,"Un-Provisioned");
-    	  LOG_INFO("\n check 1");
       }
 
       if(evt->data.evt_mesh_node_initialized.provisioned && DeviceUsesClientModel())
       {
-    	  LOG_INFO("\n check 2");
+
     	  displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioned");
     	  resp = gecko_cmd_mesh_generic_client_init()->result;
     	  LOG_INFO("\n Result gecko_cmd_mesh_generic_client_init: 0x%x",resp);
@@ -325,7 +324,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
       if(evt->data.evt_mesh_node_initialized.provisioned && DeviceUsesServerModel())
 		{
-    	  LOG_INFO("\n check 3");
+
     	  displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioned");
     	  resp = gecko_cmd_mesh_generic_server_init()->result;
     	  LOG_INFO("\n Result gecko_cmd_mesh_generic_server_init: 0x%x",resp);
@@ -385,12 +384,9 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     case gecko_evt_mesh_node_reset_id:
 
     	gecko_cmd_flash_ps_erase_all();
-
-    	//gecko_cmd_hardware_set_soft_timer();
     	break;
 
     case gecko_evt_system_external_signal_id:
-	//#if DEVICE_IS_ONOFF_PUBLISHER
     	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_COMP0)
     	{
     		CORE_DECLARE_IRQ_STATE;
