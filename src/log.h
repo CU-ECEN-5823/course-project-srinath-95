@@ -9,7 +9,7 @@
 #define SRC_LOG_H_
 #include "stdio.h"
 #include <inttypes.h>
-
+#include "timer.h"
 /**
  * Instructions for using this module:
  * 1) #include "log.h" in the C file where you'd like to add logging

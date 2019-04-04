@@ -17,8 +17,9 @@
 uint32_t loggerGetTimestamp(void)
 {
 	//return timerGetRunTimeMilliseconds();
-	return 0;
+	return rollover_count;
 }
+
 
 /**
  * Initialize logging for Blue Gecko.
