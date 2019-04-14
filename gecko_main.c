@@ -51,12 +51,16 @@
 #include "src/gpio.h"
 #include "src/timer.h"
 #include "src/display.h"
+#include "src/i2c.h"
 #include "mesh_generic_model_capi_types.h"
 
 int Button_state =0;
 int resp;
 extern PB0_pressed;
 int PB0_dummy=0;
+
+int32_t data;
+int32_t beatsPerMinute;
 
 //#define MESH_BUTTON_CLIENT_MODEL_ID 0x1001
 static uint16 _elem_index = 0x00;
@@ -219,6 +223,8 @@ void gecko_main_init()
 
     timers_init();
 
+    i2c_init();
+
   // Minimize advertisement latency by allowing the advertiser to always
   // interrupt the scanner.
   linklayer_priorities.scan_max = linklayer_priorities.adv_min + 1;
@@ -323,8 +329,10 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 		{
 
     	  displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioned");
+    	  //onoff_update_and_publish(0);
     	  resp = gecko_cmd_mesh_generic_server_init()->result;
-    	  LOG_INFO("\n Result gecko_cmd_mesh_generic_server_init: 0x%x",resp);
+
+    	  LOG_INFO("\n Result 	: 0x%x",resp);
 		}
 
       break;
@@ -337,6 +345,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     case gecko_evt_mesh_node_provisioned_id:
     	displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioned");
     	LOG_INFO("\n Provisioned");
+    	gecko_cmd_mesh_generic_client_init();
     		gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
        	break;
 
@@ -389,6 +398,13 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		CORE_ENTER_CRITICAL();
     		INTERRUPT_COMP0 = 0;
     		CORE_EXIT_CRITICAL();
+
+    		transfer(&data);
+
+			beatsPerMinute = 60 /(data / 1000.0);
+
+
+			LOG_INFO("\n Heart beat data per minute= %d",beatsPerMinute);
     	}
     	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_BUTTON)
     	{
@@ -438,3 +454,5 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
       break;
   }
 }
+
+
