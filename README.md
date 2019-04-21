@@ -9,8 +9,7 @@ Individual report: https://drive.google.com/drive/folders/1IIniGdy-oLxxy7Hk1XIjl
 
 # Project Update 2 - April 20, 2019
 1. Tried to obtain the values from MAX-30105 sensor, but was not able to accomplish in getting the read and write pointers value.
-2. Changed the sensor to AD8232, configured the ADC communication and the ADC setup is completed and the values for simple test is working.
-
+2. Changed the sensor to AD8232, configured the ADC communication and the ADC setup is completed and the values for simple test is working
 3.Established the LPN to connect with friend node.
 
 Working on:
