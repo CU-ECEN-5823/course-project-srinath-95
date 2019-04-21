@@ -184,7 +184,7 @@ void publish_data_to_friend()
 	LOG_INFO("\n Entered the publish_data_to_friend code %x", resp);
 	if(resp)
 	{
-		LOG_INFO("\n Error in update publish_data_to_friend %x", resp);
+		LOG_ERROR("\n Error in update publish_data_to_friend %x", resp);
 	}
 	else
 	{
@@ -196,7 +196,7 @@ void publish_data_to_friend()
 		 LOG_INFO("\n Publish publish_data_to_friend Success %x", resp);
 		 if(resp)
 		 {
-			 LOG_INFO("\n Error in publishing publish_data_to_friend %x", resp);
+			 LOG_ERROR("\n Error in publishing publish_data_to_friend %x", resp);
 		 }
 		 else
 		 {
@@ -435,7 +435,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
        	break;
 
     case gecko_evt_mesh_node_provisioning_failed_id:
-    	LOG_INFO("\n Provisioning failed");
+    	LOG_ERROR("\n Provisioning failed");
     	displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioning Failed");
     	gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
        	break;
@@ -482,10 +482,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     			Heart_rate_Send_data();
     		}
 
-			beatsPerMinute = 60 /(data / 1000.0);
-
-
-			LOG_INFO("\n Heart beat data per minute= %d",beatsPerMinute);
+			LOG_INFO("\n Heart beat data= %d",data);
     	}
 
 //    	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_BUTTON)
@@ -570,7 +567,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	         {
            resp  = gecko_cmd_hardware_set_soft_timer(2 * 32768, FRIEND_ESTABLISH, 1)->result;
            if (resp) {
-        	   LOG_INFO("\n gecko_cmd_hardware_set_soft_timer failed  %x\n", resp);
+        	   LOG_ERROR("\n gecko_cmd_hardware_set_soft_timer failed  %x\n", resp);
            }
     	         }
           break;
