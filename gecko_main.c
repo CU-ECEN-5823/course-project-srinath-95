@@ -53,9 +53,10 @@
 #include "src/display.h"
 #include "src/i2c.h"
 #include "mesh_generic_model_capi_types.h"
+#include "mesh_lib.h"
 
 int Button_state =0;
-int resp;
+int resp = 0;
 extern PB0_pressed;
 int PB0_dummy=0;
 
@@ -65,6 +66,9 @@ int32_t beatsPerMinute;
 //#define MESH_BUTTON_CLIENT_MODEL_ID 0x1001
 static uint16 _elem_index = 0x00;
 static uint8 trid = 0;
+static uint8 conn_handle = 0xFF;
+
+int connections_count = 0;
 
 //Sleep Mode
 const int lowest_sleep_mode = 0;
@@ -107,6 +111,7 @@ uint8_t boot_to_dfu = 0;
 
 #define TIMER_ID_RESTART    78
 #define TIMER_ID_FACTORY_RESET  77
+#define FRIEND_ESTABLISH 100
 
 const gecko_configuration_t config =
 {
@@ -142,13 +147,16 @@ void gecko_bgapi_classes_init_server_friend(void)
 	gecko_bgapi_class_system_init();
 	gecko_bgapi_class_le_gap_init();
 	gecko_bgapi_class_le_connection_init();
-	//gecko_bgapi_class_gatt_init();
+//	gecko_bgapi_class_gatt_init();
 	gecko_bgapi_class_gatt_server_init();
 	gecko_bgapi_class_hardware_init();
 	gecko_bgapi_class_flash_init();
 	gecko_bgapi_class_test_init();
-	//gecko_bgapi_class_sm_init();
-	//mesh_native_bgapi_init();
+//	gecko_bgapi_class_sm_init();
+//	mesh_native_bgapi_init();
+
+	// gecko_initCoexHAL(); //added
+
 	gecko_bgapi_class_mesh_node_init();
 	//gecko_bgapi_class_mesh_prov_init();
 	gecko_bgapi_class_mesh_proxy_init();
@@ -164,6 +172,49 @@ void gecko_bgapi_classes_init_server_friend(void)
 	//gecko_bgapi_class_mesh_friend_init();
 }
 
+void publish_data_to_friend()
+{
+	struct mesh_generic_state pulse_data;
+	pulse_data.kind = mesh_generic_state_level;
+	pulse_data.level.level = data;
+
+	LOG_INFO("\n Entered the publish_data_to_friend");
+
+	resp = mesh_lib_generic_server_update(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,_elem_index,&pulse_data,0,0);
+	LOG_INFO("\n Entered the publish_data_to_friend code %x", resp);
+	if(resp)
+	{
+		LOG_INFO("\n Error in update publish_data_to_friend %x", resp);
+	}
+	else
+	{
+		LOG_INFO("Update publish_data_to_friend Success\n ");
+		 resp = mesh_lib_generic_server_publish(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,
+														_elem_index,
+														mesh_generic_state_level);
+
+		 LOG_INFO("\n Publish publish_data_to_friend Success %x", resp);
+		 if(resp)
+		 {
+			 LOG_INFO("\n Error in publishing publish_data_to_friend %x", resp);
+		 }
+		 else
+		 {
+			 LOG_INFO("\n Success in publishing data to friend");
+		 }
+	}
+}
+
+void Button_status_send()
+{
+	LOG_INFO("\n Entered button status function");
+	publish_data_to_friend();
+}
+void Heart_rate_Send_data()
+{
+	LOG_INFO("\n Entered button status function");
+	publish_data_to_friend();
+}
 
 /**
  * See main function list in soc-btmesh-switch project file
@@ -186,8 +237,8 @@ void gecko_bgapi_classes_init_client_lpn(void)
 	gecko_bgapi_class_mesh_proxy_init();
 	gecko_bgapi_class_mesh_proxy_server_init();
 	//gecko_bgapi_class_mesh_proxy_client_init();
-	gecko_bgapi_class_mesh_generic_client_init();
-	//gecko_bgapi_class_mesh_generic_server_init();
+//	gecko_bgapi_class_mesh_generic_client_init();
+	gecko_bgapi_class_mesh_generic_server_init();
 	//gecko_bgapi_class_mesh_vendor_model_init();
 	//gecko_bgapi_class_mesh_health_client_init();
 	//gecko_bgapi_class_mesh_health_server_init();
@@ -196,6 +247,37 @@ void gecko_bgapi_classes_init_client_lpn(void)
 	//gecko_bgapi_class_mesh_friend_init();
 
 }
+
+
+void lpn_init(void)
+{
+  uint16 res;
+  // Initialize LPN functionality.
+  res = gecko_cmd_mesh_lpn_init()->result;
+  if (res) {
+    printf("\n LPN_Init failed (0x%x)", res);
+    return;
+  }
+
+  res = gecko_cmd_mesh_lpn_configure(2, 5 * 1000)->result;
+  if (res) {
+    printf("LPN_confg failed (0x%x)\r\n", res);
+    return;
+  }
+
+  res = gecko_cmd_mesh_lpn_establish_friendship(0)->result;
+  if (res != 0) {
+    printf("Friend Establish status %x\r\n", res);
+  }
+}
+
+void lpn_init2(void)
+{
+	 /* Initialize mesh lib */
+	 mesh_lib_init(malloc, free, 8);
+	 lpn_init();
+}
+
 
 void gecko_main_init()
 {
@@ -223,7 +305,6 @@ void gecko_main_init()
 
     timers_init();
 
-    i2c_init();
 
   // Minimize advertisement latency by allowing the advertiser to always
   // interrupt the scanner.
@@ -277,15 +358,12 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	 else
     	 {
     		 LOG_INFO("\n Enter non factory reset section");
-			 #if DEVICE_IS_ONOFF_PUBLISHER
-    		 displayPrintf(DISPLAY_ROW_NAME ,"Publisher");
-			#else
-    		 displayPrintf(DISPLAY_ROW_NAME ,"Subscriber");
-			#endif
+
+    		 displayPrintf(DISPLAY_ROW_NAME ,"LPN-HR");
 
     		 struct gecko_msg_system_get_bt_address_rsp_t *address_t;
-    		     		 		address_t = gecko_cmd_system_get_bt_address();
-    		     		 		displayPrintf(DISPLAY_ROW_BTADDR,"%02x:%02x:%02x:%02x:%02x:%02x",address_t->address.addr[5],address_t->address.addr[4],address_t->address.addr[3],address_t->address.addr[2],address_t->address.addr[1],address_t->address.addr[0]);
+				address_t = gecko_cmd_system_get_bt_address();
+				displayPrintf(DISPLAY_ROW_BTADDR,"%02x:%02x:%02x:%02x:%02x:%02x",address_t->address.addr[5],address_t->address.addr[4],address_t->address.addr[3],address_t->address.addr[2],address_t->address.addr[1],address_t->address.addr[0]);
     		 struct gecko_msg_system_get_bt_address_rsp_t *pAddr = gecko_cmd_system_get_bt_address();
 
     		 set_device_name(&pAddr->address);
@@ -305,10 +383,30 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
               // restart timer expires, reset the device
               gecko_cmd_system_reset(0);
               break;
+
+            case FRIEND_ESTABLISH:
+			 {
+			   printf("Finding friend...\r\n");
+			  uint16_t res = gecko_cmd_mesh_lpn_establish_friendship(0)->result;
+
+			   if (res != 0) {
+				 printf("Friend establish error code: %x\r\n", res);
+			   }
+			 }
+			 break;
+
+            default:
+            	break;
           }
           break;
 
     case gecko_evt_mesh_node_initialized_id:
+    	 resp = gecko_cmd_mesh_generic_server_init()->result;
+		if(resp)
+		{
+			printf("\n Server_Init Failed %x", resp);
+		}
+
     	LOG_INFO("\n Entered gecko_evt_mesh_node_initialized_id");
       if (!evt->data.evt_mesh_node_initialized.provisioned) {
         // The Node is now initialized, start unprovisioned Beaconing using PB-ADV and PB-GATT Bearers
@@ -317,22 +415,10 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	  displayPrintf(DISPLAY_ROW_CONNECTION ,"Un-Provisioned");
       }
 
-      if(evt->data.evt_mesh_node_initialized.provisioned && DeviceUsesClientModel())
-      {
 
-    	  displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioned");
-    	  resp = gecko_cmd_mesh_generic_client_init()->result;
-    	  LOG_INFO("\n Result gecko_cmd_mesh_generic_client_init: 0x%x",resp);
-      }
-
-      if(evt->data.evt_mesh_node_initialized.provisioned && DeviceUsesServerModel())
+      if(evt->data.evt_mesh_node_initialized.provisioned)
 		{
-
-    	  displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioned");
-    	  //onoff_update_and_publish(0);
-    	  resp = gecko_cmd_mesh_generic_server_init()->result;
-
-    	  LOG_INFO("\n Result 	: 0x%x",resp);
+    	  lpn_init2();
 		}
 
       break;
@@ -345,8 +431,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     case gecko_evt_mesh_node_provisioned_id:
     	displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioned");
     	LOG_INFO("\n Provisioned");
-    	gecko_cmd_mesh_generic_client_init();
-    		gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
+    	lpn_init2();
        	break;
 
     case gecko_evt_mesh_node_provisioning_failed_id:
@@ -356,10 +441,9 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
        	break;
 
     case gecko_evt_mesh_generic_server_client_request_id:
-    	if(DeviceUsesServerModel())
-    	{
+
     		LOG_INFO("\n Entered Server client request id ");
-    		uint8 button_stat =0;
+    		uint8 button_stat = 0;
     		button_stat = evt->data.evt_mesh_generic_server_client_request.parameters.data[0];
     		if(button_stat == 1)
 			{
@@ -371,25 +455,17 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				LOG_INFO("\n Button Released");
 				displayPrintf(DISPLAY_ROW_PASSKEY ,"Button Released");
 			}
-    		mesh_lib_generic_server_event_handler();
+    		//mesh_lib_generic_server_event_handler();
 
-    		//LOG_INFO("\n Result: %d",resp);
-    	}
     	break;
-
-    case gecko_evt_mesh_generic_server_state_changed_id:
-		if(DeviceUsesServerModel())
-		{
-			LOG_INFO("\n Entered generic_server_state_changed_id ");
-			mesh_lib_generic_server_event_handler();
-		}
-
-		break;
 
     case gecko_evt_mesh_node_reset_id:
 
     	gecko_cmd_flash_ps_erase_all();
+    	gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
+
     	break;
+
 
     case gecko_evt_system_external_signal_id:
     	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_COMP0)
@@ -399,13 +475,24 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		INTERRUPT_COMP0 = 0;
     		CORE_EXIT_CRITICAL();
 
-    		transfer(&data);
+    		adc_reading(&data);
+
+    		if(data != NULL)
+    		{
+    			Heart_rate_Send_data();
+    		}
 
 			beatsPerMinute = 60 /(data / 1000.0);
 
 
 			LOG_INFO("\n Heart beat data per minute= %d",beatsPerMinute);
     	}
+
+//    	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_BUTTON)
+//    	{
+//    		LOG_INFO("\n Entered the Interrupt button external event");
+//    		Button_status_send();
+//    	}
     	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_BUTTON)
     	{
     		LOG_INFO("\n Entered the on off publish section");
@@ -420,15 +507,23 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		LOG_INFO("\n The state of the button is %d",Button_state);
 
 			trid +=1;
-			struct mesh_generic_request custom;
-			custom.kind = mesh_generic_request_on_off;
-			custom.on_off = Button_state;
-    		resp = mesh_lib_generic_client_publish(MESH_GENERIC_ON_OFF_CLIENT_MODEL_ID,_elem_index, trid, &custom, 0,0, 0);
+			Button_status_send();
+//			struct mesh_generic_request custom;
+//			custom.kind = mesh_generic_request_on_off;
+//			custom.on_off = Button_state;
+//    		resp = mesh_lib_generic_client_publish(MESH_GENERIC_ON_OFF_CLIENT_MODEL_ID,_elem_index, trid, &custom, 0,0, 0);
 
-    		LOG_INFO("\n Result of publish: %d",resp);
+//    		LOG_INFO("\n Result of publish: %d",resp);
     	}
 
 	break;
+
+    case gecko_evt_le_connection_opened_id:
+          printf("evt:gecko_evt_le_connection_opened_id\r\n");
+          connections_count++;
+          conn_handle = evt->data.evt_le_connection_opened.connection;
+
+          break;
     case gecko_evt_le_connection_closed_id:
       /* Check if need to boot to dfu mode */
       if (boot_to_dfu) {
@@ -436,7 +531,50 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	gecko_cmd_flash_ps_erase_all();
         gecko_cmd_system_reset(2);
       }
+      if(connections_count >0)
+      {
+    	  if(--connections_count == 0)
+    	  {
+    		     lpn_init();
+    	  }
+      }
+
+
       break;
+
+    case gecko_evt_mesh_generic_server_state_changed_id:
+       mesh_lib_generic_server_event_handler(evt);
+       break;
+
+    case gecko_evt_mesh_lpn_friendship_established_id:
+          LOG_INFO("\n Friendship established\n");
+
+          break;
+
+    case gecko_evt_mesh_lpn_friendship_failed_id:
+         LOG_INFO("friendship failed\r\n");
+         if(connections_count == 0)
+         {
+        	 resp  = gecko_cmd_hardware_set_soft_timer(2 * 32768, FRIEND_ESTABLISH, 1)->result;
+        	          if (resp) {
+        	         	 LOG_INFO("\n gecko_cmd_hardware_set_soft_timer failed  %x\n", resp);
+        	          }
+         }
+
+         break;
+
+
+    case gecko_evt_mesh_lpn_friendship_terminated_id:
+    	LOG_INFO("friendship terminated\r\n");
+    	 if(connections_count == 0)
+    	         {
+           resp  = gecko_cmd_hardware_set_soft_timer(2 * 32768, FRIEND_ESTABLISH, 1)->result;
+           if (resp) {
+        	   LOG_INFO("\n gecko_cmd_hardware_set_soft_timer failed  %x\n", resp);
+           }
+    	         }
+          break;
+
     case gecko_evt_gatt_server_user_write_request_id:
       if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
         /* Set flag to enter to OTA mode */
@@ -450,6 +588,10 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
         gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
       }
       break;
+
+
+       break;
+
     default:
       break;
   }
