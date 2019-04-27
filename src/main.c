@@ -9,7 +9,6 @@ extern void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt);
 
 int main(void)
 {
-
 	//gecko_bgapi_classes_init_server_friend();
   // Initialize stack
   gecko_main_init();

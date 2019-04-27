@@ -5,6 +5,9 @@
  *      Author: srina
  */
 #include "adc.h"
+extern uint32_t data;
+
+#define threshold 1800;
 
 void setupSensor(void)
 {
@@ -28,16 +31,31 @@ void setupSensor(void)
 
 void adc_reading()
 {
+	 NVIC_EnableIRQ(ADC0_IRQn);
+	 ADC_IntEnable(ADC0,ADC_IF_SINGLE);
+
 	ADC_Start(ADC0, adcStartSingle);
 	LOG_INFO("\n Entered Adc_reading");
-	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK))
+//	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK))
+//	{
+//
+//	}
+	if(TX_done_flag)
 	{
+		LOG_INFO("\n check");
+		uint32_t ADC_data = ADC_DataSingleGet(ADC0);
+		data = (ADC_data * 2500) / 4096;
+		LOG_INFO("\n The signal value is: %d",data);
 
 	}
+}
 
-	LOG_INFO("\n check");
-	uint32_t ADC_data = ADC_DataSingleGet(ADC0);
-	uint32_t millivolts = (ADC_data * 2500) / 4096;
-	LOG_INFO("\n The signal value is: %d",millivolts);
-
+void ADC0_IRQHandler(void)
+{
+	LOG_INFO("\n Entered ADC0_IRQhandler");
+	CORE_ATOMIC_IRQ_DISABLE();
+	TX_done_flag = true;
+	CORE_ATOMIC_IRQ_ENABLE();
+	NVIC_DisableIRQ(ADC0_IRQn);
+	ADC_IntDisable(ADC0,ADC_IF_SINGLE);
 }
