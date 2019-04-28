@@ -40,7 +40,7 @@ void adc_reading()
 	{
 		uint32_t ADC_data = ADC_DataSingleGet(ADC0);
 		adc_data = (ADC_data * 2500) / 4096;
-		LOG_INFO("\n The signal value is: %d",adc_data);
+		//LOG_INFO("\n The signal value is: %d",adc_data);
 
 	}
 }
