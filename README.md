@@ -16,6 +16,7 @@ Individual report: https://drive.google.com/drive/folders/1IIniGdy-oLxxy7Hk1XIjl
 Working on:
 1. Publish data to the friend.
 
-# Tasks for upcoming Week
-1. Get the sensor data to work with actual data when connected to human body parts
-2. OOB authentication and persistent data
+# Final Update - April 27,2019
+1. Implemented Persistent data
+2. Implemented the ADC interrupt for Load power management of the sensor
+3. Established complete functionality with Friend Node using On/Off and Level model
