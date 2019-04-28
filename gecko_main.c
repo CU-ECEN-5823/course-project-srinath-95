@@ -51,26 +51,26 @@
 #include "src/gpio.h"
 #include "src/timer.h"
 #include "src/display.h"
+#include "src/gecko_ble_errors.h"
 #include "mesh_generic_model_capi_types.h"
 #include "mesh_lib.h"
 
 int Button_state =0;
-int resp = 0;
+int resp = 0;	// check the response of function
 extern int PB0_pressed;
 extern int PB1_pressed;
-int PB0_dummy = 0;
-int PB1_dummy = 0;
+int PB0_dummy = 0;	//getting the PB0 button status
+int PB1_dummy = 0;	//getting the PB1 button status
 
 
 
-uint32_t adc_data;
-int32_t beatsPerMinute;
+uint32_t adc_data;	//To get the ADC data of the heartrate sensor
 
 extern bool TX_done_flag;
 
 //#define MESH_BUTTON_CLIENT_MODEL_ID 0x1001
 static uint16 _elem_index = 0x00;
-//static uint8 trid = 0;
+
 static uint8 conn_handle = 0xFF;
 
 int connections_count = 0;
@@ -117,14 +117,14 @@ uint8_t boot_to_dfu = 0;
 #define TIMER_ID_RESTART    78
 #define TIMER_ID_FACTORY_RESET  77
 #define FRIEND_ESTABLISH 100
-#define ADC_FREQ 90
-#define ADC_FREQ_OFF 91
+
 
 #define upper_threshold 2498
 #define lower_threshold 100
+#define abnormal_value 50	//Setting an abnormal value to indicate abnormal activity of the patient
 
 uint8_t DEFIBRILLATOR_STATE = 0;
-volatile int32_t tog_val;
+
 
 #define TIMER_CLK_FREQ ((uint32)32768)
 #define TIMER_MS_2_TIMERTICK(ms) ((TIMER_CLK_FREQ * ms) / 1000)
@@ -291,7 +291,6 @@ void lpn_init(void)
     return;
   }
 
-
   res = gecko_cmd_mesh_lpn_configure(2, 5 * 1000)->result;
   if (res) {
 	  LOG_INFO("LPN_confg failed (0x%x)\r\n", res);
@@ -393,15 +392,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		 set_device_name(&pAddr->address);
 			 gecko_cmd_mesh_node_init();
 
-			 ps_load_object(0x4000, &DEFIBRILLATOR_STATE, sizeof(DEFIBRILLATOR_STATE));
-			 if(DEFIBRILLATOR_STATE ==1)
-			 {
-				 displayPrintf(DISPLAY_ROW_ACTION ,"Defibrillate");
-			 }
-			 else
-			 {
-				 displayPrintf(DISPLAY_ROW_ACTION ,"STOP");
-			 }
+
     	 }
 
       break;
@@ -428,14 +419,6 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			   }
 			 }
 			 break;
-            case ADC_FREQ:
-            	LOG_INFO("Toggle LED");
-            	gpioLed1SetOn();
-			 break;
-
-            case ADC_FREQ_OFF:
-            	gpioLed1SetOff();
-            	break;
 
             default:
             	break;
@@ -465,6 +448,20 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	  /* Initialize mesh library for different models */
     	  mesh_lib_init(malloc, free, 8);
 		  lpn_init();
+
+		  /*Loading the persistent data*/
+		  ps_load_object(0x4000, &DEFIBRILLATOR_STATE, sizeof(DEFIBRILLATOR_STATE));
+		 if(DEFIBRILLATOR_STATE ==1)
+		 {
+			 displayPrintf(DISPLAY_ROW_ACTION ,"Defibrillate");
+			 gpioLed1SetOn();
+
+		 }
+		 else
+		 {
+
+			 displayPrintf(DISPLAY_ROW_ACTION ,"STOP");
+		 }
 		}
 
       break;
@@ -491,19 +488,20 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     case gecko_evt_mesh_generic_server_client_request_id:
 
 		LOG_INFO("\n Entered Server client request id ");
-		uint8 button_stat = 0;
-		button_stat = evt->data.evt_mesh_generic_server_client_request.parameters.data[0];
-		if(button_stat == 1)
+		uint8 Defibrillator_stat  = 0;
+		Defibrillator_stat = evt->data.evt_mesh_generic_server_client_request.parameters.data[0];
+		if(Defibrillator_stat == 1)
 		{
-			LOG_INFO("\n Button Pressed");
+			LOG_INFO("\n STOP DEFIBRILLATE");
 			displayPrintf(DISPLAY_ROW_ACTION ,"STOP");
+			gpioLed1SetOff();
 			DEFIBRILLATOR_STATE = 0;
 			ps_save_object(0x4000, &DEFIBRILLATOR_STATE, sizeof(DEFIBRILLATOR_STATE));
 
 		}
 		else
 		{
-			LOG_INFO("\n Button Released");
+			LOG_INFO("\n DEFIBRILLATE");
 			displayPrintf(DISPLAY_ROW_PASSKEY ,"Defibrillate");
 		}
 
@@ -526,28 +524,18 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		TX_done_flag = 0;
     		CORE_EXIT_CRITICAL();
 
+    		/* To read the value from the sensor*/
     		adc_reading();
 
 			LOG_INFO("\n Heart beat data= %d",adc_data);
-			if(adc_data >1400 && adc_data < 1700)
-			{
-				tog_val = 0.5;
-				gecko_cmd_hardware_set_soft_timer((0.3 * 32768), ADC_FREQ, 1);
-//				gecko_cmd_hardware_set_soft_timer((0.3 * 32768), ADC_FREQ_OFF, 1);
-				gpioLed1SetOff();
-			}
-			if(adc_data >= 1700 && adc_data <= 2300)
-			{
-				tog_val = 0.9;
-				gecko_cmd_hardware_set_soft_timer((0.4 * 32768), ADC_FREQ, 1);
-				//gecko_cmd_hardware_set_soft_timer((0.4 * 32768), ADC_FREQ_OFF, 1);
-				gpioLed1SetOff();
-			}
+			displayPrintf(DISPLAY_ROW_TEMPVALUE ,"Heart-Rate: %d",adc_data);
 
 			if(adc_data <lower_threshold)
 			{
+
+					gpioLed1SetOn();
+
 				displayPrintf(DISPLAY_ROW_ACTION ,"Defibrillate");
-				gpioLed1SetOff();
 				publish_data_to_friend(adc_data);
 			}
     	}
@@ -561,13 +549,17 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		PB0_dummy = 1 - PB0_pressed;
     		Button_state = PB0_dummy;
 
-
-    		adc_data = 99;
+    		/*Setting adc reading to abnormal value to indicate abnormality of the patient*/
+    		adc_data = abnormal_value;
 
     		LOG_INFO("\n The state of the button is %d",Button_state);
     		LOG_INFO("\n Heart beat data after = %d",adc_data);
+    		displayPrintf(DISPLAY_ROW_TEMPVALUE ,"Heart-Rate: %d",adc_data);
     		if(adc_data < lower_threshold)
 			{
+
+    			gpioLed1SetOn();
+
 				 displayPrintf(DISPLAY_ROW_ACTION ,"Defibrillate");
 				 DEFIBRILLATOR_STATE = 1;
 				 ps_save_object(0x4000, &DEFIBRILLATOR_STATE, sizeof(DEFIBRILLATOR_STATE));
@@ -578,7 +570,6 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	}
     	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_BUTTON1)
 		{
-			LOG_INFO("\n Entered the on off publish section");
 
 			CORE_DECLARE_IRQ_STATE;
 			CORE_ENTER_CRITICAL();
@@ -588,42 +579,28 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			Button_state = PB1_dummy;
 
 			displayPrintf(DISPLAY_ROW_ACTION ,"STOP");
+			DEFIBRILLATOR_STATE = 0;
+			 ps_save_object(0x4000, &DEFIBRILLATOR_STATE, sizeof(DEFIBRILLATOR_STATE));
+			gpioLed1SetOff();
+
 		}
 
 	break;
 
-    case gecko_evt_le_connection_opened_id:
-          LOG_INFO("\n evt:gecko_evt_le_connection_opened_id\r\n");
-          connections_count++;
-          conn_handle = evt->data.evt_le_connection_opened.connection;
-
-          break;
-    case gecko_evt_le_connection_closed_id:
-      /* Check if need to boot to dfu mode */
-      if (boot_to_dfu) {
-        /* Enter to DFU OTA mode */
-    	gecko_cmd_flash_ps_erase_all();
-        gecko_cmd_system_reset(2);
-      }
-      if(connections_count >0)
-      {
-    	  if(--connections_count == 0)
-    	  {
-    		     lpn_init();
-    	  }
-      }
-      break;
 
     case gecko_evt_mesh_generic_server_state_changed_id:
        mesh_lib_generic_server_event_handler(evt);
        break;
 
     case gecko_evt_mesh_lpn_friendship_established_id:
+    	displayPrintf(DISPLAY_ROW_CONNECTION ,"Friend Success");
+
           LOG_INFO("\n Friendship established\r\n");
           break;
 
     case gecko_evt_mesh_lpn_friendship_failed_id:
          LOG_INFO("\n friendship failed\r\n");
+         displayPrintf(DISPLAY_ROW_CONNECTION ,"Friend Fail");
          if(connections_count == 0)
          {
 			resp  = gecko_cmd_hardware_set_soft_timer(TIMER_MS_2_TIMERTICK(2000), FRIEND_ESTABLISH, 1)->result;
@@ -637,6 +614,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     case gecko_evt_mesh_lpn_friendship_terminated_id:
     	LOG_INFO("\n friendship terminated\r\n");
+    	displayPrintf(DISPLAY_ROW_CONNECTION ,"Friend Terminate");
     	 if(connections_count == 0)
     	         {
            resp  = gecko_cmd_hardware_set_soft_timer(TIMER_MS_2_TIMERTICK(2000), FRIEND_ESTABLISH, 1)->result;
@@ -646,19 +624,19 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	         }
           break;
 
-    case gecko_evt_gatt_server_user_write_request_id:
-      if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
-        /* Set flag to enter to OTA mode */
-        boot_to_dfu = 1;
-        /* Send response to Write Request */
-        gecko_cmd_gatt_server_send_user_write_response(
-          evt->data.evt_gatt_server_user_write_request.connection,
-          gattdb_ota_control,
-          bg_err_success);
-        /* Close connection to enter to DFU OTA mode*/
-        gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
-      }
-      break;
+//    case gecko_evt_gatt_server_user_write_request_id:
+//      if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
+//        /* Set flag to enter to OTA mode */
+//        boot_to_dfu = 1;
+//        /* Send response to Write Request */
+//        gecko_cmd_gatt_server_send_user_write_response(
+//          evt->data.evt_gatt_server_user_write_request.connection,
+//          gattdb_ota_control,
+//          bg_err_success);
+//        /* Close connection to enter to DFU OTA mode*/
+//        gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
+//      }
+//      break;
 
 
        break;
