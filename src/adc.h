@@ -21,9 +21,23 @@
 
 volatile uint32_t Signal;
 
+/* function name: setupSensor
+ * description: This function is used to setup the AD8232 Sensor
+ * arguments: void
+ * return type: void
+ */
 void setupSensor(void);
+
+/* function name: adc_reading
+ * description: To read the ADC value from the sensor AD8232
+ * arguments: void
+ * return type: void
+ */
 void adc_reading();
 
+/* Flag to check if Transmission is complete*/
 bool TX_done_flag;
+
+extern uint32_t adc_data;
 
 #endif /* SRC_ADC_H_ */

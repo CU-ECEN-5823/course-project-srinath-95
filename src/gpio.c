@@ -33,54 +33,35 @@ void gpioInit()
 	GPIO_IntConfig(PB1_port,PB1_pin,true,false,true);
 }
 
-void gpioSetDisplayExtcomin(bool high)
-{
-	if(high)
-	{
-		GPIO_PinOutSet(gpioPortD,13);
-	}
-	else
-	{
-		GPIO_PinOutClear(gpioPortD,13);
-	}
-}
-
 void GPIO_ODD_IRQHandler()
 {
 	CORE_AtomicDisableIrq();
-		//LOG_INFO("\n Entered the GPIO interrupt handler");
-		//CORE_ATOMIC_IRQ_DISABLE();
+
 		pending_irq = GPIO_IntGet();	// gets the interrupt flag register to know the status pending interrupts
-		//PB0_pressed = GPIO_PinInGet(PB0_port,PB0_pin);	// Getting the status of PB0 button
-		//LOG_INFO("\n PB0_pressed status: %d", PB0_pressed);
+
 		PB1_pressed = GPIO_PinInGet(PB1_port,PB1_pin);
-		//LOG_INFO("\n PB1_pressed status: %d", PB1_pressed);
+
 
 			INTERRUPT_BUTTON1 = true;
 			gecko_external_signal(INTERRUPT_BUTTON1);	// Call the external signal(State Machine) to notify the button press event
 
 
-		 GPIO_IntClear(pending_irq);	// Clearing the GPIO interrupts
-		 //CORE_ATOMIC_IRQ_ENABLE();
+		 GPIO_IntClear(pending_irq);	// Clearing the GPIO interrupt
 		 CORE_AtomicEnableIrq();
 }
 void GPIO_EVEN_IRQHandler()
 {
 	CORE_AtomicDisableIrq();
-	//LOG_INFO("\n Entered the GPIO interrupt handler");
-	//CORE_ATOMIC_IRQ_DISABLE();
+
 	pending_irq = GPIO_IntGet();	// gets the interrupt flag register to know the status pending interrupts
 	PB0_pressed = GPIO_PinInGet(PB0_port,PB0_pin);	// Getting the status of PB0 button
-	//LOG_INFO("\n PB0_pressed status: %d", PB0_pressed);
-	//PB1_pressed = GPIO_PinInGet(PB1_port,PB1_pin);
-	//LOG_INFO("\n PB1_pressed status: %d", PB1_pressed);
-//	if(PB0_pressed){
+
 		INTERRUPT_BUTTON0 = true;
 	 	 gecko_external_signal(INTERRUPT_BUTTON0);	// Call the external signal(State Machine) to notify the button press event
-//	}
+
 
 	 GPIO_IntClear(pending_irq);	// Clearing the GPIO interrupts
-	 //CORE_ATOMIC_IRQ_ENABLE();
+
 	 CORE_AtomicEnableIrq();
 
 }

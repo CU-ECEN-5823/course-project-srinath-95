@@ -71,8 +71,6 @@ extern bool TX_done_flag;
 //#define MESH_BUTTON_CLIENT_MODEL_ID 0x1001
 static uint16 _elem_index = 0x00;
 
-static uint8 conn_handle = 0xFF;
-
 int connections_count = 0;
 
 //Sleep Mode
@@ -191,6 +189,14 @@ void gecko_bgapi_classes_init_server_friend(void)
  * Reference for Persistent data code
  * link : https://www.silabs.com/community/wireless/bluetooth/knowledge-base.entry.html/2017/05/02/how_to_save_floatva-Udm8
  * */
+
+/* function name: ps_save_object
+ * description: This function is used to save persistent data storage
+ * arguments: uint16_t,void*,uint8_t
+ * return type: uint16_t
+ */
+
+
 uint16_t ps_save_object(uint16_t key, void *pValue, uint8_t size)
 {
 	struct gecko_msg_flash_ps_save_rsp_t *pResp;
@@ -199,6 +205,12 @@ uint16_t ps_save_object(uint16_t key, void *pValue, uint8_t size)
 
 	return(pResp->result);
 }
+
+/* function name: ps_load_object
+ * description: This function is used to load persistent data storage
+ * arguments: uint16_t,void*,uint8_t
+ * return type: uint16_t
+ */
 
 uint16_t ps_load_object(uint16_t key, void *pValue, uint8_t size)
 {
@@ -220,6 +232,11 @@ uint16_t ps_load_object(uint16_t key, void *pValue, uint8_t size)
 	return(pResp->result);
 }
 
+/* function name: publish_data_to_friend
+ * description: This function is used to publish the abnormal data to the Friend
+ * arguments: uint32_t
+ * return type: void
+ */
 void publish_data_to_friend(uint32_t abnormal_data)
 {
 	struct mesh_generic_state pulse_data;
@@ -375,8 +392,9 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		 displayPrintf(DISPLAY_ROW_NAME ,"FACTORY RESET");
     		 LOG_INFO("\n Entered factory reset section");
 
-    		 gecko_cmd_flash_ps_erase_all();
-    		 gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_FACTORY_RESET, 1);
+    		 BTSTACK_CHECK_RESPONSE(gecko_cmd_flash_ps_erase_all());
+    		 BTSTACK_CHECK_RESPONSE( gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_FACTORY_RESET, 1));
+
     	 }
     	 else
     	 {
@@ -390,7 +408,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		 struct gecko_msg_system_get_bt_address_rsp_t *pAddr = gecko_cmd_system_get_bt_address();
 
     		 set_device_name(&pAddr->address);
-			 gecko_cmd_mesh_node_init();
+    		 BTSTACK_CHECK_RESPONSE(gecko_cmd_mesh_node_init());
 
 
     	 }
@@ -482,7 +500,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     case gecko_evt_mesh_node_provisioning_failed_id:
     	LOG_ERROR("\n Provisioning failed");
     	displayPrintf(DISPLAY_ROW_CONNECTION ,"Provisioning Failed");
-    	gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
+    	BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1));
        	break;
 
     case gecko_evt_mesh_generic_server_client_request_id:
@@ -509,8 +527,8 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     case gecko_evt_mesh_node_reset_id:
 
-    	gecko_cmd_flash_ps_erase_all();
-    	gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
+    	BTSTACK_CHECK_RESPONSE(gecko_cmd_flash_ps_erase_all());
+    	BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1));
 
     	break;
 
@@ -623,21 +641,6 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
            }
     	         }
           break;
-
-//    case gecko_evt_gatt_server_user_write_request_id:
-//      if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
-//        /* Set flag to enter to OTA mode */
-//        boot_to_dfu = 1;
-//        /* Send response to Write Request */
-//        gecko_cmd_gatt_server_send_user_write_response(
-//          evt->data.evt_gatt_server_user_write_request.connection,
-//          gattdb_ota_control,
-//          bg_err_success);
-//        /* Close connection to enter to DFU OTA mode*/
-//        gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
-//      }
-//      break;
-
 
        break;
 
