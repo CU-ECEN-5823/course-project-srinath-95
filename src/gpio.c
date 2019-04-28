@@ -8,16 +8,6 @@
 #include "em_gpio.h"
 #include <string.h>
 
-
-#define	LED0_port gpioPortF
-#define LED0_pin	4
-#define LED1_port gpioPortF
-#define LED1_pin 5
-#define PB0_port gpioPortF
-#define PB0_pin 6
-#define PB1_port gpioPortF
-#define PB1_pin 7
-
 int pending_irq;	// gets the interrupt flag register to know the status pending interrupts
 int PB0_pressed;	//To get the status of PB0 button
 int PB1_pressed;

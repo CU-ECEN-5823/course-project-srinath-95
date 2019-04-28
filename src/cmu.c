@@ -22,6 +22,7 @@ void cmu_init(void)
 	// Initialize the CMU block for ultra-low frequency EM3 mode
 	else if(lowest_sleep_mode > 2) //
 	{
+		LOG_INFO("Entered ultra-low frequency");
 		CMU_OscillatorEnable(cmuOsc_ULFRCO,true,false);
 		CMU_ClockSelectSet(cmuClock_LFA,cmuSelect_ULFRCO);
 		CMU_ClockEnable(cmuClock_LFA,true);

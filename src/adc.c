@@ -5,7 +5,7 @@
  *      Author: srina
  */
 #include "adc.h"
-extern uint32_t data;
+extern uint32_t adc_data;
 
 #define threshold 1800;
 
@@ -36,16 +36,12 @@ void adc_reading()
 
 	ADC_Start(ADC0, adcStartSingle);
 	LOG_INFO("\n Entered Adc_reading");
-//	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK))
-//	{
-//
-//	}
 	if(TX_done_flag)
 	{
 		LOG_INFO("\n check");
 		uint32_t ADC_data = ADC_DataSingleGet(ADC0);
-		data = (ADC_data * 2500) / 4096;
-		LOG_INFO("\n The signal value is: %d",data);
+		adc_data = (ADC_data * 2500) / 4096;
+		LOG_INFO("\n The signal value is: %d",adc_data);
 
 	}
 }

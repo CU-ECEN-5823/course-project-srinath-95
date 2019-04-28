@@ -9,6 +9,7 @@
 #define SRC_CMU_H_
 
 #include "em_cmu.h"
+#include "log.h"
 
 void cmu_init(void);
 

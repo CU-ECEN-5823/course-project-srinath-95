@@ -23,7 +23,7 @@
 /*******************************
  * MACROS
  *******************************/
-#define CLOCK_PERIOD (0.5)	// Setting the Clock Period
+#define CLOCK_PERIOD (1)	// Setting the Clock Period
 #define LED_ON (0.175)	// Setting the Led on time
 
 

@@ -51,7 +51,6 @@
 #include "src/gpio.h"
 #include "src/timer.h"
 #include "src/display.h"
-//#include "src/i2c.h"
 #include "mesh_generic_model_capi_types.h"
 #include "mesh_lib.h"
 
@@ -64,7 +63,7 @@ int PB1_dummy = 0;
 
 
 
-uint32_t data;
+uint32_t adc_data;
 int32_t beatsPerMinute;
 
 extern bool TX_done_flag;
@@ -77,7 +76,7 @@ static uint8 conn_handle = 0xFF;
 int connections_count = 0;
 
 //Sleep Mode
-const int lowest_sleep_mode = 0;
+const int lowest_sleep_mode = 3;
 
 /***********************************************************************************************//**
  * @addtogroup Application
@@ -118,11 +117,14 @@ uint8_t boot_to_dfu = 0;
 #define TIMER_ID_RESTART    78
 #define TIMER_ID_FACTORY_RESET  77
 #define FRIEND_ESTABLISH 100
+#define ADC_FREQ 90
+#define ADC_FREQ_OFF 91
 
 #define upper_threshold 2498
 #define lower_threshold 100
 
 uint8_t DEFIBRILLATOR_STATE = 0;
+volatile int32_t tog_val;
 
 #define TIMER_CLK_FREQ ((uint32)32768)
 #define TIMER_MS_2_TIMERTICK(ms) ((TIMER_CLK_FREQ * ms) / 1000)
@@ -170,8 +172,6 @@ void gecko_bgapi_classes_init_server_friend(void)
 //	gecko_bgapi_class_sm_init();
 //	mesh_native_bgapi_init();
 
-	// gecko_initCoexHAL(); //added
-
 	gecko_bgapi_class_mesh_node_init();
 	//gecko_bgapi_class_mesh_prov_init();
 	gecko_bgapi_class_mesh_proxy_init();
@@ -187,7 +187,10 @@ void gecko_bgapi_classes_init_server_friend(void)
 	//gecko_bgapi_class_mesh_friend_init();
 }
 
-
+/*
+ * Reference for Persistent data code
+ * link : https://www.silabs.com/community/wireless/bluetooth/knowledge-base.entry.html/2017/05/02/how_to_save_floatva-Udm8
+ * */
 uint16_t ps_save_object(uint16_t key, void *pValue, uint8_t size)
 {
 	struct gecko_msg_flash_ps_save_rsp_t *pResp;
@@ -217,28 +220,23 @@ uint16_t ps_load_object(uint16_t key, void *pValue, uint8_t size)
 	return(pResp->result);
 }
 
-void publish_data_to_friend(uint32_t data)
+void publish_data_to_friend(uint32_t abnormal_data)
 {
 	struct mesh_generic_state pulse_data;
 	pulse_data.kind = mesh_generic_state_level;
-	pulse_data.level.level = data;
-
-	//LOG_INFO("\n Entered the publish_data_to_friend");
+	pulse_data.level.level = abnormal_data;
 
 	resp = mesh_lib_generic_server_update(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,_elem_index,&pulse_data,0,0);
-	//LOG_INFO("\n Entered the publish_data_to_friend code %x", resp);
 	if(resp)
 	{
 		LOG_ERROR("\n Error in update publish_data_to_friend %x", resp);
 	}
 	else
 	{
-		//LOG_INFO("Update publish_data_to_friend Success\n ");
 		 resp = mesh_lib_generic_server_publish(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,
 														_elem_index,
 														mesh_generic_state_level);
 
-		 //LOG_INFO("\n Publish publish_data_to_friend Success %x", resp);
 		 if(resp)
 		 {
 			 LOG_ERROR("\n Error in publishing publish_data_to_friend %x", resp);
@@ -373,9 +371,9 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     case gecko_evt_system_boot_id:
     	LOG_INFO("\n Entered Boot id");
 
-    	 if (GPIO_PinInGet(gpioPortF,6) == 0)
+    	 if (GPIO_PinInGet(PB0_port,PB0_pin) == 0)
     	 {
-    		 displayPrintf(DISPLAY_ROW_NAME ,"FAC RESET");
+    		 displayPrintf(DISPLAY_ROW_NAME ,"FACTORY RESET");
     		 LOG_INFO("\n Entered factory reset section");
 
     		 gecko_cmd_flash_ps_erase_all();
@@ -430,6 +428,14 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			   }
 			 }
 			 break;
+            case ADC_FREQ:
+            	LOG_INFO("Toggle LED");
+            	gpioLed1SetOn();
+			 break;
+
+            case ADC_FREQ_OFF:
+            	gpioLed1SetOff();
+            	break;
 
             default:
             	break;
@@ -445,18 +451,20 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     	LOG_INFO("\n Entered gecko_evt_mesh_node_initialized_id");
       if (!evt->data.evt_mesh_node_initialized.provisioned) {
-        // The Node is now initialized, start unprovisioned Beaconing using PB-ADV and PB-GATT Bearers
+        // The Node is now initialized, start unprovisioned BePB0_pinaconing using PB-ADV and PB-GATT Bearers
     	  resp = gecko_cmd_mesh_node_start_unprov_beaconing(0x3);
     	  LOG_INFO("\n Result gecko_evt_mesh_node_initialized_id: 0x%x",resp);
     	  displayPrintf(DISPLAY_ROW_CONNECTION ,"Un-Provisioned");
       }
 
+      struct gecko_msg_mesh_node_initialized_evt_t *pData = (struct gecko_msg_mesh_node_initialized_evt_t *)&(evt->data);
 
       if(evt->data.evt_mesh_node_initialized.provisioned)
 		{
+    	  LOG_INFO("\n Provisioned Address: %x, ivi:%ld\r\n", pData->address, pData->ivi);
     	  /* Initialize mesh library for different models */
     	  mesh_lib_init(malloc, free, 8);
-    	 	 lpn_init();
+		  lpn_init();
 		}
 
       break;
@@ -520,18 +528,32 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     		adc_reading();
 
-			LOG_INFO("\n Heart beat data= %d",data);
-			if(data >upper_threshold || data <lower_threshold)
+			LOG_INFO("\n Heart beat data= %d",adc_data);
+			if(adc_data >1400 && adc_data < 1700)
+			{
+				tog_val = 0.5;
+				gecko_cmd_hardware_set_soft_timer((0.3 * 32768), ADC_FREQ, 1);
+//				gecko_cmd_hardware_set_soft_timer((0.3 * 32768), ADC_FREQ_OFF, 1);
+				gpioLed1SetOff();
+			}
+			if(adc_data >= 1700 && adc_data <= 2300)
+			{
+				tog_val = 0.9;
+				gecko_cmd_hardware_set_soft_timer((0.4 * 32768), ADC_FREQ, 1);
+				//gecko_cmd_hardware_set_soft_timer((0.4 * 32768), ADC_FREQ_OFF, 1);
+				gpioLed1SetOff();
+			}
+
+			if(adc_data <lower_threshold)
 			{
 				displayPrintf(DISPLAY_ROW_ACTION ,"Defibrillate");
-				publish_data_to_friend(data);
+				gpioLed1SetOff();
+				publish_data_to_friend(adc_data);
 			}
     	}
 
     	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_BUTTON0)
     	{
-    		//LOG_INFO("\n Entered the on off publish section");
-
     		CORE_DECLARE_IRQ_STATE;
     		CORE_ENTER_CRITICAL();
     		INTERRUPT_BUTTON0 = false;
@@ -539,20 +561,19 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		PB0_dummy = 1 - PB0_pressed;
     		Button_state = PB0_dummy;
 
-    		adc_reading(&data);
-    		LOG_INFO("\n Heart beat data before= %d",data);
-    		data = 99;
+
+    		adc_data = 99;
 
     		LOG_INFO("\n The state of the button is %d",Button_state);
-    		LOG_INFO("\n Heart beat data after = %d",data);
-    		if(data < lower_threshold)
+    		LOG_INFO("\n Heart beat data after = %d",adc_data);
+    		if(adc_data < lower_threshold)
 			{
 				 displayPrintf(DISPLAY_ROW_ACTION ,"Defibrillate");
 				 DEFIBRILLATOR_STATE = 1;
 				 ps_save_object(0x4000, &DEFIBRILLATOR_STATE, sizeof(DEFIBRILLATOR_STATE));
 
 			}
-    		publish_data_to_friend(data);
+    		publish_data_to_friend(adc_data);
 
     	}
     	if(evt->data.evt_system_external_signal.extsignals & INTERRUPT_BUTTON1)
@@ -566,19 +587,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			PB1_dummy = 1 - PB1_pressed;
 			Button_state = PB1_dummy;
 
-			adc_reading(&data);
-			LOG_INFO("\n Heart beat data before= %d",data);
-
-			data = data + 1500;
-
-			LOG_INFO("\n The state of the button is %d",Button_state);
-			LOG_INFO("\n Heart beat data= %d",data);
-
-			if(data > upper_threshold)
-			{
-				 displayPrintf(DISPLAY_ROW_ACTION ,"Defibrillate");
-			}
-			publish_data_to_friend(data);
+			displayPrintf(DISPLAY_ROW_ACTION ,"STOP");
 		}
 
 	break;
@@ -603,8 +612,6 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		     lpn_init();
     	  }
       }
-
-
       break;
 
     case gecko_evt_mesh_generic_server_state_changed_id:
@@ -612,8 +619,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
        break;
 
     case gecko_evt_mesh_lpn_friendship_established_id:
-          LOG_INFO("\n Friendship established\n");
-
+          LOG_INFO("\n Friendship established\r\n");
           break;
 
     case gecko_evt_mesh_lpn_friendship_failed_id:
